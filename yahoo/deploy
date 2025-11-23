@@ -1,0 +1,3 @@
+cd functions
+npm install firebase-admin firebase-functions
+firebase deploy --only functions:signupProxy
