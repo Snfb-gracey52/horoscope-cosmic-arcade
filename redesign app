@@ -1,0 +1,36 @@
+from reportlab.platypus import SimpleDocTemplate, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.pdfbase import pdfmetrics
+import zipfile, os
+
+# Register font
+pdfmetrics.registerFont(UnicodeCIDFont("HYSMyeongJo-Medium"))
+
+# Create PDF
+pdf_path = "/mnt/data/CosmicArcade_Guide.pdf"
+styles = getSampleStyleSheet()
+styles["Normal"].fontName = "HYSMyeongJo-Medium"
+doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+story = [Paragraph("Cosmic Arcade App Store & Play Store Submission Guide (Simplified)", styles["Normal"])]
+doc.build(story)
+
+# Create ZIP with placeholder structure
+zip_path = "/mnt/data/CosmicArcade_FinalBundle.zip"
+root = "/mnt/data/cosmic_arcade_app"
+os.makedirs(root, exist_ok=True)
+os.makedirs(f"{root}/ios", exist_ok=True)
+os.makedirs(f"{root}/android", exist_ok=True)
+os.makedirs(f"{root}/assets/screenshots", exist_ok=True)
+os.makedirs(f"{root}/website", exist_ok=True)
+
+with open(f"{root}/README.txt","w") as f:
+    f.write("Cosmic Arcade App Placeholder Structure")
+
+with zipfile.ZipFile(zip_path, "w") as z:
+    for folder, _, files in os.walk(root):
+        for file in files:
+            z.write(os.path.join(folder,file), os.path.relpath(os.path.join(folder,file), root))
+
+zip_path, pdf_path
