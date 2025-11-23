@@ -1,0 +1,3 @@
+cd path/to/source
+python3 -m http.server 8000
+# or use live server extension
