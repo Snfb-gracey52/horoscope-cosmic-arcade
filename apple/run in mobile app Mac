@@ -1,0 +1,3 @@
+cd cosmic-f-arcade/app
+npm install
+expo start
