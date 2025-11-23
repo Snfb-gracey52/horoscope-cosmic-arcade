@@ -1,0 +1,33 @@
+// functions/index.js
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+admin.initializeApp();
+
+const RATE_LIMIT_SECONDS = 5; // allow one signup every 5s per IP
+
+const memory = {}; // in-memory cache (for demo only). Use Redis for production.
+
+exports.signupProxy = functions.https.onRequest(async (req, res) => {
+  try {
+    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    const now = Date.now();
+
+    if (memory[ip] && (now - memory[ip]) < RATE_LIMIT_SECONDS * 1000) {
+      return res.status(429).send({error: "Too many requests"});
+    }
+    memory[ip] = now;
+
+    const { uid, name } = req.body;
+    if (!uid || !name) return res.status(400).send({error: "Missing fields"});
+
+    await admin.firestore().collection('users').doc(uid).set({
+      name,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    return res.status(200).send({ ok: true });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).send({ error: "Server error" });
+  }
+});
