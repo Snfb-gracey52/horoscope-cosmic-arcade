@@ -1,0 +1,4 @@
+cd~/Downloads/cosmic_f_arcade_full_package
+npm install
+expo start
+#scan the QR with Expo Go on your phone or use a simulator
