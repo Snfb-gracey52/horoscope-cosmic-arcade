@@ -1,0 +1,15 @@
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(clients.claim());
+});
+
+// Basic hardened fetch protection
+self.addEventListener("fetch", (event) => {
+  const safeMethods = ["GET", "HEAD"];
+  if (!safeMethods.includes(event.request.method)) return;
+
+  event.respondWith(fetch(event.request));
+});
