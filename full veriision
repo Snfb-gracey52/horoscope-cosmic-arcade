@@ -1,0 +1,251 @@
+# Generating the final Cosmic Arcade "Horoscope Slots" release package
+# This will create a full project structure with source files, website, store metadata,
+# realistic-device screenshot mockups, icons, promo page, PDF guide, and final ZIP bundle.
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont
+import zipfile, textwrap, os, json
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import letter
+
+base = Path("/mnt/data/horoscope_final_release_full")
+if base.exists():
+    import shutil
+    shutil.rmtree(base)
+base.mkdir(parents=True)
+
+# Create folders
+src = base / "source"
+site = base / "website"
+icons = base / "icons"
+meta = base / "store_metadata"
+screens = base / "screenshots"
+assets = base / "assets"
+promo = base / "promo"
+for d in [src, site, icons, meta, screens, assets, promo]:
+    d.mkdir(parents=True, exist_ok=True)
+
+# -- Source files (PWA version) --
+index_html = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Horoscope Slots</title>
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+</head>
+<body>
+<main class="wrap">
+<header><h1>Horoscope Slots 🔮</h1></header>
+<section id="signupBox">
+<label for="emailInput">Enter name or email to play</label><br/>
+<input id="emailInput" placeholder="Your name or email" />
+<button onclick="quickSignup()">Start</button>
+<p id="signupStatus" class="muted"></p>
+</section>
+<section id="gameBox" style="display:none">
+<div class="slots">
+<div class="reel" id="r1">—</div>
+<div class="reel" id="r2">—</div>
+<div class="reel" id="r3">—</div>
+<div class="bonus" id="bonus">⭐</div>
+</div>
+<div class="controls">
+<button id="spinBtn" onclick="spin()">SPIN</button>
+<button id="bonusBtn" onclick="bonusSpin()">BONUS</button>
+</div>
+<div id="result" class="result">Ready to play.</div>
+</section>
+<section id="promo"><h3>Promo</h3><div id="promoDemo"><button onclick="playPromo()">Play Promo Clip</button></div></section>
+<footer><small>© SNFB BY Grace 2026-2027 — All Rights Reserved</small><br/><a href="privacy.html" target="_blank">Privacy Policy</a></footer>
+</main>
+<script src="signup.js"></script>
+<script src="slot.js"></script>
+<script>
+function playPromo(){ window.open('promo.html','_blank'); }
+</script>
+</body>
+</html>
+"""
+
+style_css = """:root{--bg:#07122a;--accent:#ffd54f;--muted:#9aa4b2}
+body{margin:0;font-family:Arial,system-ui;background:linear-gradient(180deg,#041226,#07122a);color:#fff;display:flex;justify-content:center;min-height:100vh}
+.wrap{width:100%;max-width:760px;padding:28px}
+h1{margin:0 0 12px 0}
+input{padding:10px;border-radius:8px;border:1px solid #2a3446;width:70%;margin:8px 8px 8px 0}
+button{padding:10px 14px;border-radius:10px;border:none;background:var(--accent);color:#07122a;font-weight:700;cursor:pointer}
+.slots{display:flex;gap:10px;justify-content:center;margin:18px 0}
+.reel{width:88px;height:88px;border-radius:10px;background:#081428;display:flex;align-items:center;justify-content:center;font-size:34px;border:2px solid #1f2b44}
+.bonus{background:linear-gradient(180deg,#fff7e2,#ffd54f);color:#07122a}
+.controls{display:flex;gap:12px;justify-content:center}
+.result{margin-top:12px;color:var(--muted);text-align:center}
+footer{margin-top:20px;text-align:center;color:var(--muted);font-size:12px}
+.muted{color:var(--muted)}
+"""
+
+slot_js = """const signs = ["♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓"];
+const bonusIcons = ["⭐","💎","🔮","💰"];
+function spin() {
+  const r1 = signs[Math.floor(Math.random()*signs.length)];
+  const r2 = signs[Math.floor(Math.random()*signs.length)];
+  const r3 = signs[Math.floor(Math.random()*signs.length)];
+  document.getElementById('r1').textContent = r1;
+  document.getElementById('r2').textContent = r2;
+  document.getElementById('r3').textContent = r3;
+  document.getElementById('bonus').textContent = bonusIcons[Math.floor(Math.random()*bonusIcons.length)];
+  const result = document.getElementById('result');
+  if (r1===r2 && r2===r3) {
+    result.textContent = `💥 JACKPOT — ${r1} energy amplified!`;
+  } else {
+    result.textContent = `${r1} • ${r2} • ${r3} — Your daily vibe.`;
+  }
+}
+function bonusSpin() { spin(); const r = document.getElementById('result'); r.textContent = '🔮 Bonus spin! ' + r.textContent; }
+"""
+
+signup_js = """function quickSignup(){
+  const input = document.getElementById('emailInput');
+  const v = (input.value||'').trim();
+  if(!v){ document.getElementById('signupStatus').textContent = 'Please enter a name or email.'; return; }
+  const uid = 'user_' + Math.floor(Math.random()*999999);
+  const entry = { uid, name: v, createdAt: new Date().toISOString() };
+  localStorage.setItem('horoscope_user', JSON.stringify(entry));
+  document.getElementById('signupBox').style.display = 'none';
+  document.getElementById('gameBox').style.display = 'block';
+  document.getElementById('result').textContent = `Welcome, ${v}! Press SPIN to play.`;
+}
+"""
+
+manifest_json = {
+  "name":"Horoscope Slots",
+  "short_name":"Slots",
+  "start_url":"index.html",
+  "display":"standalone",
+  "background_color":"#07122a",
+  "theme_color":"#07122a",
+  "icons":[{"src":"icons/icon-192.png","sizes":"192x192","type":"image/png"},{"src":"icons/icon-512.png","sizes":"512x512","type":"image/png"}]
+}
+
+privacy_html = """<!doctype html><html><head><meta charset="utf-8"><title>Privacy Policy</title></head><body><h2>Privacy Policy — Horoscope Slots</h2><p>© SNFB BY Grace 2026-2027</p><p>We store only local, non-sensitive data for gameplay (name or email used as identifier). We do not collect passwords or personal data unless you enable cloud sync. If you enable optional cloud services, separate terms will apply.</p><p>Contact: add-your-email-here</p></body></html>"""
+
+promo_html = """<!doctype html><html><head><meta charset="utf-8"><title>Promo</title></head><body style="background:#07122a;color:#fff;font-family:Arial,padding:20px;text-align:center"><h1>Horoscope Slots</h1><p>Spin the stars — daily horoscopes & bonus reels.</p><p>Record this page or your screen for an MP4 promo.</p></body></html>"""
+
+# write files into source
+(src / "index.html").write_text(index_html, encoding="utf-8")
+(src / "style.css").write_text(style_css, encoding="utf-8")
+(src / "slot.js").write_text(slot_js, encoding="utf-8")
+(src / "signup.js").write_text(signup_js, encoding="utf-8")
+(src / "manifest.json").write_text(json.dumps(manifest_json, indent=2), encoding="utf-8")
+(src / "privacy.html").write_text(privacy_html, encoding="utf-8")
+(src / "promo.html").write_text(promo_html, encoding="utf-8")
+
+# icons (create PNGs)
+def make_icon(path, size, text):
+    img = Image.new("RGBA", (size, size), (7,18,34,255))
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.truetype("DejaVuSans-Bold.ttf", size//2)
+    except:
+        font = ImageFont.load_default()
+    w,h = draw.textsize(text, font=font)
+    draw.text(((size-w)/2,(size-h)/2), text, font=font, fill=(255,213,79,255))
+    img.save(path)
+
+make_icon(icons / "icon-192.png", 192, "HS")
+make_icon(icons / "icon-512.png", 512, "HS")
+
+# website files
+site_index = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport"content="width=device-width,initial-scale=1"><title>Horoscope Slots — Official</title><meta name="description" content="Horoscope Slots — Spin the stars and read your daily horoscope."><link rel="stylesheet" href="style.css"></head><body><header style="text-align:center;padding:40px;background:#07122a;color:#fff"><h1>Horoscope Slots</h1><p>Cosmic Arcade — Spin the stars</p><a href="../source/index.html">Open the App</a></header></body></html>"""
+(site / "index.html").write_text(site_index, encoding="utf-8")
+(site / "style.css").write_text("body{font-family:Arial;text-align:center;padding:40px}", encoding="utf-8")
+
+# store metadata: play and app store
+play_store = {
+    "title":"Horoscope Slots",
+    "short_description":"Spin the stars — quick daily horoscopes with bonus reels.",
+    "full_description":"Horoscope Slots is a playful slot machine that reveals your daily horoscope. Spin, match, and unlock the bonus reel. Quick signup with no password required. PWA-ready and lightweight.",
+    "what_is_new":"Initial release: slot mechanics, bonus reel, PWA support."
+}
+app_store = {
+    "name":"Horoscope Slots",
+    "subtitle":"Daily horoscope slots & bonus reel",
+    "promotional_text":"Spin the stars — your fortune awaits",
+    "description":"Horoscope Slots blends playful slot mechanics with astrology. Spin to reveal your daily horoscope, win bonus rewards, and enjoy a friendly, no-password signup. Ideal for daily check-ins.",
+    "keywords":"horoscope, astrology, slots, daily, bonus, fortune",
+    "support_url":"https://example.com/support",
+    "marketing_url":"https://example.com",
+    "privacy_policy_url":"https://example.com/privacy.html"
+}
+(meta / "play_store.json").write_text(json.dumps(play_store, indent=2), encoding="utf-8")
+(meta / "app_store.json").write_text(json.dumps(app_store, indent=2), encoding="utf-8")
+
+# screenshots: real-device mockups (iPhone 1290x2796) create 6, Android 1080x2400 create 6
+def create_screenshot(path, width, height, title):
+    img = Image.new("RGB", (width, height), (7,18,34))
+    draw = ImageDraw.Draw(img)
+    try:
+        font_title = ImageFont.truetype("DejaVuSans-Bold.ttf", 72)
+        font_body = ImageFont.truetype("DejaVuSans.ttf", 36)
+    except:
+        font_title = ImageFont.load_default()
+        font_body = ImageFont.load_default()
+    # header box
+    draw.rectangle([(60,80),(width-60,280)], fill=(10,28,50))
+    tw, th = draw.textsize(title, font=font_title)
+    draw.text(((width-tw)/2,120), title, font=font_title, fill=(255,213,79))
+    # center UI mockup
+    ui_w, ui_h = int(width*0.8), int(height*0.5)
+    ui_x = (width-ui_w)//2
+    ui_y = 400
+    draw.rounded_rectangle([ui_x, ui_y, ui_x+ui_w, ui_y+ui_h], radius=24, fill=(12,24,40))
+    # reels mock
+    reel_w = ui_w//5
+    rx = ui_x + (ui_w - 3*reel_w)//2
+    for i in range(3):
+        draw.ellipse([rx + i*reel_w, ui_y+100, rx + i*reel_w + reel_w-20, ui_y+100 + reel_w-20], fill=(20,40,60))
+        draw.text((rx + i*reel_w + 20, ui_y+120), "♈", font=font_title, fill=(255,213,79))
+    # footer text
+    draw.text((width//2-200, ui_y+ui_h+40), "Spin the stars — daily horoscope", font=font_body, fill=(180,200,220))
+    img.save(path)
+
+# iPhone screenshots
+for i in range(1,7):
+    create_screenshot(screens / f"iphone_{i}.png", 1290, 2796, f"Horoscope Slots — Screen {i}")
+
+# Android screenshots
+for i in range(1,7):
+    create_screenshot(screens / f"android_{i}.png", 1080, 2400, f"Horoscope Slots — Screen {i}")
+
+# promo html (already created), also create promo script file
+(meta / "promo_script.txt").write_text(textwrap.dedent("""
+10-second promo script:
+1. Shot: starfield intro (2s) - text: Discover your daily fortune
+2. Shot: reels spinning (4s) - text: Spin the Horoscope Slots
+3. Shot: bonus reel explosion (2s) - text: Unlock bonuses
+4. Shot: CTA (2s) - text: Play now — SNFB BY Grace
+Record the screen of source/index.html for high-quality video.
+"""))
+
+# Create final ZIP bundle
+final_zip = Path("/mnt/data/Horoscope_Cosmic_Arcade_Final_Package.zip")
+with zipfile.ZipFile(final_zip, "w", zipfile.ZIP_DEFLATED) as z:
+    for p in base.rglob("*"):
+        z.write(p, arcname=p.relative_to(base))
+
+# Create PDF submission guide
+pdf_path = Path("/mnt/data/Horoscope_Cosmic_Arcade_Submission_Guide.pdf")
+styles = getSampleStyleSheet()
+doc = SimpleDocTemplate(str(pdf_path), pagesize=letter)
+story = []
+story.append(Paragraph("Horoscope Slots — Cosmic Arcade Submission Guide", styles["Title"]))
+story.append(Spacer(1,6))
+story.append(Paragraph("This package includes full source code, website, icons, screenshots, and store metadata.", styles["BodyText"]))
+story.append(Spacer(1,6))
+story.append(Paragraph("Quick steps:", styles["Heading2"]))
+for step in ["Unzip the package", "Test locally from the 'source' folder", "Upload 'source' files to GitHub (not the zip)", "Enable GitHub Pages (Settings → Pages)", "Use PWABuilder to generate Android AAB and iOS wrapper", "Upload to stores using the metadata in 'store_metadata' folder"]:
+    story.append(Paragraph("• " + step, styles["BodyText"]))
+doc.build(story)
+
+# Return paths
+str(final_zip), str(pdf_path), str(base)
