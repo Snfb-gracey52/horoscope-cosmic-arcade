@@ -1,2 +1,2 @@
-# horoscope-cosmic-arcade
+# Horoscope-Cosmic-Arcade
 horoscope app and website
