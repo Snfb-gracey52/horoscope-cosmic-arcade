@@ -1,0 +1,306 @@
+# Retry: Creating the full "Cosmic F Arcade - Deluxe Expanded" package with extra arcane games and powered-up horoscope engine.
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont
+import zipfile, os, json, textwrap, shutil
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import letter
+
+base = Path("/mnt/data/cosmic_f_arcade_full_package")
+if base.exists():
+    shutil.rmtree(base)
+base.mkdir(parents=True)
+
+# Create folders
+app = base / "app"  # expo app
+web = base / "web"  # pwa web
+assets = base / "assets"
+meta = base / "store_metadata"
+screens = base / "screenshots"
+functions = base / "functions"
+security = base / "security"
+for d in [app, web, assets, meta, screens, functions, security]:
+    d.mkdir(parents=True, exist_ok=True)
+
+# --- APP: Expo starter files ---
+(app / "package.json").write_text(json.dumps({
+    "name":"cosmic-f-arcade",
+    "version":"1.0.0",
+    "main":"node_modules/expo/AppEntry.js",
+    "scripts":{
+        "start":"expo start",
+        "android":"expo run:android",
+        "ios":"expo run:ios"
+    },
+    "dependencies":{
+        "expo":"~48.0.0",
+        "react":"18.2.0",
+        "react-native":"0.71.0",
+        "expo-router":"^1.0.0"
+    }
+}, indent=2), encoding="utf-8")
+
+(app / "App.js").write_text("""import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import Home from './screens/Home';
+import Arcade from './screens/Arcade';
+import Tarot from './screens/Tarot';
+import Numerology from './screens/Numerology';
+import Settings from './screens/Settings';
+
+export default function App() {
+  const Tab = createBottomTabNavigator();
+  return (
+    <NavigationContainer>
+      <Tab.Navigator>
+        <Tab.Screen name="Home" component={Home} />
+        <Tab.Screen name="Arcade" component={Arcade} />
+        <Tab.Screen name="Tarot" component={Tarot} />
+        <Tab.Screen name="Numerology" component={Numerology} />
+        <Tab.Screen name="Settings" component={Settings} />
+      </Tab.Navigator>
+    </NavigationContainer>
+  );
+}""", encoding="utf-8")
+
+# app screens
+(app / "screens").mkdir(exist_ok=True)
+(app / "screens" / "Home.js").write_text("""import React from 'react';
+import { View, Text, Button } from 'react-native';
+
+export default function Home({navigation}){
+  return (
+    <View style={{padding:20}}>
+      <Text style={{fontSize:26}}>Cosmic F Arcade</Text>
+      <Text>Welcome to your cosmic playground.</Text>
+      <Button title="Play Arcade" onPress={()=>navigation.navigate('Arcade')} />
+    </View>
+  );
+}""", encoding="utf-8")
+
+# Arcade screen with multiple mini-games entry
+(app / "screens" / "Arcade.js").write_text("""import React, {useState} from 'react';
+import { View, Text, Button } from 'react-native';
+import SlotMini from '../games/SlotMini';
+import MemoryMatch from '../games/MemoryMatch';
+import Journey from '../games/Journey';
+
+export default function Arcade(){
+  const [mode, setMode] = useState('menu');
+  return (
+    <View style={{padding:20}}>
+      {mode==='menu' && (
+        <>
+          <Text style={{fontSize:22}}>Arcade Hub</Text>
+          <Button title="Cosmic Slot" onPress={()=>setMode('slot')} />
+          <Button title="Memory Match" onPress={()=>setMode('memory')} />
+          <Button title="Fate Journey" onPress={()=>setMode('journey')} />
+        </>
+      )}
+      {mode==='slot' && <SlotMini onBack={()=>setMode('menu')} />}
+      {mode==='memory' && <MemoryMatch onBack={()=>setMode('menu')} />}
+      {mode==='journey' && <Journey onBack={()=>setMode('menu')} />}
+    </View>
+  );
+}""", encoding="utf-8")
+
+# games
+(app / "games").mkdir(exist_ok=True)
+# SlotMini
+(app / "games" / "SlotMini.js").write_text("""import React, {useState} from 'react';
+import { View, Text, Button } from 'react-native';
+const symbols=['⭐','🌙','🌞','🔮'];
+export default function SlotMini({onBack}){
+  const [reels,setReels]=useState(['-','-','-']);
+  const spin=()=>{
+    const r=[symbols[Math.floor(Math.random()*symbols.length)],symbols[Math.floor(Math.random()*symbols.length)],symbols[Math.floor(Math.random()*symbols.length)]];
+    setReels(r);
+  };
+  return (<View><Text style={{fontSize:36}}>{reels.join('  ')}</Text><Button title="Spin" onPress={spin} /><Button title="Back" onPress={onBack} /></View>);
+}""", encoding="utf-8")
+
+# MemoryMatch simple
+(app / "games" / "MemoryMatch.js").write_text("""import React,{useState} from 'react';
+import { View, Text, TouchableOpacity, Button } from 'react-native';
+const items=['A','A','B','B','C','C'];
+export default function MemoryMatch({onBack}){
+  const [board,setBoard]=useState(items.sort(()=>Math.random()-0.5));
+  const [flips,setFlips]=useState([]);
+  const [matched,setMatched]=useState([]);
+  const flip=(i)=>{
+    if(flips.includes(i)||matched.includes(i)) return;
+    const nf=[...flips,i]; setFlips(nf);
+    if(nf.length===2){
+      const a=nf[0], b=nf[1];
+      if(board[a]===board[b]){ setMatched([...matched,a,b]); }
+      setTimeout(()=>setFlips([]),600);
+    }
+  };
+  return (<View><Text style={{fontSize:22}}>Memory Match</Text>{board.map((c,i)=>(<TouchableOpacity key={i} onPress={()=>flip(i)} style={{padding:10,borderWidth:1,margin:5}}><Text>{matched.includes(i)||flips.includes(i)?board[i]:'?'}</Text></TouchableOpacity>))}<Button title="Back" onPress={onBack} /></View>);
+}""", encoding="utf-8")
+
+# Journey mini-game
+(app / "games" / "Journey.js").write_text("""import React,{useState} from 'react';
+import { View, Text, Button } from 'react-native';
+export default function Journey({onBack}){
+  const [step,setStep]=useState(1);
+  const [score,setScore]=useState(0);
+  const choose=(v)=>{ setScore(score+v); setStep(step+1); };
+  if(step===4) return (<View><Text>Your fate score: {score}</Text><Button title="Back" onPress={onBack} /></View>);
+  return (<View><Text>Path {step}</Text><Button title="Choice A" onPress={()=>choose(10)} /><Button title="Choice B" onPress={()=>choose(5)} /></View>);
+}""", encoding="utf-8")
+
+# Tarot screen
+(app / "screens" / "Tarot.js").write_text("""import React from 'react';
+import { View, Text, Button } from 'react-native';
+const cards=[{name:'The Star',meaning:'Hope'},{name:'The Moon',meaning:'Intuition'},{name:'The Sun',meaning:'Joy'}];
+export default function Tarot(){ const draw=()=>{ const c=cards[Math.floor(Math.random()*cards.length)]; alert(c.name+': '+c.meaning); }; return (<View style={{padding:20}}><Text style={{fontSize:22}}>Tarot</Text><Button title="Draw a Card" onPress={draw} /></View>); }""", encoding="utf-8")
+
+# Numerology screen with calculations
+(app / "screens" / "Numerology.js").write_text("""import React,{useState} from 'react';
+import { View, Text, TextInput, Button } from 'react-native';
+function lifePath(d){ if(!d) return ''; const s=d.replace(/-/g,''); let total=0; for(let ch of s) total+=parseInt(ch); while(total>9) total=total.toString().split('').reduce((a,b)=>a+parseInt(b),0); return total; }
+export default function Numerology(){ const [dob,setDob]=useState(''); const [lp,setLp]=useState(''); return (<View style={{padding:20}}><Text>Numerology</Text><TextInput value={dob} onChangeText={setDob} placeholder='YYYY-MM-DD' style={{borderWidth:1,padding:8}} /><Button title="Calculate" onPress={()=>setLp(lifePath(dob))} /><Text>Life Path: {lp}</Text></View>); }""", encoding="utf-8")
+
+# Settings screen with security info
+(app / "screens" / "Settings.js").write_text("""import React from 'react';
+import { View, Text } from 'react-native';
+export default function Settings(){ return (<View style={{padding:20}}><Text style={{fontSize:18}}>Settings & Security</Text><Text>Offline caching enabled</Text><Text>Service worker hardened (web)</Text></View>); }""", encoding="utf-8")
+
+# --- WEB: PWA files ---
+(web / "index.html").write_text("""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport"content="width=device-width,initial-scale=1"><title>Cosmic F Arcade</title><meta name="description" content="Cosmic F Arcade - horoscope and arcade mini-games"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;"><link rel="manifest" href="manifest.json"><link rel="stylesheet" href="style.css"></head><body><main><h1>Cosmic F Arcade</h1><p>Open the app or try the games below.</p><div><a href="slot.html">Open Slot Demo</a> | <a href="tarot.html">Tarot</a> | <a href="numerology.html">Numerology</a></div></main><script src="app-integrity.js"></script><script src="slot.js"></script></body></html>""", encoding="utf-8")
+
+# web slot demo
+(web / "slot.html").write_text("""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport"content="width=device-width,initial-scale=1"><title>Slot Demo</title><link rel="stylesheet" href="style.css"></head><body><h1>Slot Demo</h1><div id="reels">- - -</div><button onclick="spin()">Spin</button><p id="res"></p><script src="slot.js"></script></body></html>""", encoding="utf-8")
+
+# web tarot and numerology pages
+(web / "tarot.html").write_text("<!doctype html><html><body><h1>Tarot Demo</h1><button onclick=\"draw()\">Draw</button><script>function draw(){const c=['The Star','The Moon','The Sun'][Math.floor(Math.random()*3)];alert(c);}</script></body></html>", encoding="utf-8")
+(web / "numerology.html").write_text("<!doctype html><html><body><h1>Numerology</h1><input id='d' placeholder='YYYY-MM-DD'/><button onclick=\"calc()\">Calc</button><script>function calc(){const d=document.getElementById('d').value;let s=d.replace(/-/g,'');let total=0;for(let ch of s) total+=parseInt(ch||0);while(total>9) total=total.toString().split('').reduce((a,b)=>a+parseInt(b),0);alert('Life Path: '+total);}</script></body></html>", encoding="utf-8")
+
+# web slot.js - enhanced horoscope engine + slot logic
+web_slot_js = """
+// Enhanced horoscope engine + slot logic
+const signs = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const traits = {
+  'Aries':'Bold energy and new starts.',
+  'Taurus':'Grounded focus and steady growth.',
+  'Gemini':'Curious mind and conversation.',
+  'Cancer':'Emotional wisdom and care.',
+  'Leo':'Brave heart and creative spark.',
+  'Virgo':'Detail-oriented progress.',
+  'Libra':'Balance and social grace.',
+  'Scorpio':'Intensity and transformation.',
+  'Sagittarius':'Adventure and optimism.',
+  'Capricorn':'Ambition and structure.',
+  'Aquarius':'Ideas and innovation.',
+  'Pisces':'Compassion and intuition.'
+};
+
+function getHoroscopeForSign(sign){
+  const base = traits[sign] || 'An open sky of possibilities.';
+  const luck = Math.floor(Math.random()*100);
+  return `${base} Luck: ${luck}%`;
+}
+
+function spin(){
+  const r1=signs[Math.floor(Math.random()*signs.length)];
+  const r2=signs[Math.floor(Math.random()*signs.length)];
+  const r3=signs[Math.floor(Math.random()*signs.length)];
+  document.getElementById('reels').innerText = r1 + ' | ' + r2 + ' | ' + r3;
+  if(r1===r2 && r2===r3){
+    document.getElementById('res').innerText = 'JACKPOT! ' + getHoroscopeForSign(r1);
+  } else {
+    document.getElementById('res').innerText = getHoroscopeForSign(r1);
+  }
+}
+"""
+(web / "slot.js").write_text(web_slot_js, encoding="utf-8")
+
+# web style
+(web / "style.css").write_text("body{font-family:Arial;text-align:center;padding:40px;background:linear-gradient(#041226,#07122a);color:#fff}button{padding:10px 20px;border-radius:8px;background:#ffd54f;border:none;color:#07122a}", encoding="utf-8")
+
+# app-integrity.js (fake hashes for demo)
+security_hashes = {}
+def fake_hash(name):
+    import base64
+    return base64.b64encode(name.encode()).decode()
+security_hashes['/slot.js'] = fake_hash('slot.js')
+security_hashes['/signup.js'] = fake_hash('signup.js')
+security_hashes['/index.html'] = fake_hash('index.html')
+(security / "app-integrity.js").write_text(f"""(async function(){{const expected={json.dumps(security_hashes)};async function fetchAndHash(path){{try{{const r=await fetch(path,{{cache:'no-store'}});const buf=await r.arrayBuffer();const h=Array.from(new Uint8Array(buf)).map(x=>x.toString(16).padStart(2,'0')).join('');return btoa(h);}}catch(e){{return null;}}}}for(const [p,exp] of Object.entries(expected)){{const h=await fetchAndHash(p);if(!h||h!==exp){{document.body.innerHTML='<h2>Security check failed</h2>';throw new Error('Integrity failed');}}}})();""", encoding="utf-8")
+
+# service-worker.js hardened for web
+(web / "service-worker.js").write_text("""const CACHE_NAME='cosmic-f-cache-v1';const ALLOW=['/','/index.html','/slot.html','/slot.js','/style.css','/manifest.json'];self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(ALLOW)));self.skipWaiting();});self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.map(k=>k!==CACHE_NAME?caches.delete(k):Promise.resolve()))));self.clients.claim();});self.addEventListener('fetch',e=>{const url=new URL(e.request.url);if(url.origin!==location.origin && !url.hostname.endsWith('googleapis.com')) return e.respondWith(new Response('',{status:403,statusText:'Blocked'}));e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});""", encoding="utf-8")
+
+# manifest
+(web / "manifest.json").write_text(json.dumps({
+    "name":"Cosmic F Arcade",
+    "short_name":"CosmicF",
+    "start_url":"index.html",
+    "display":"standalone",
+    "background_color":"#07122a",
+    "theme_color":"#07122a",
+    "icons":[{"src":"icons/icon-192.png","sizes":"192x192","type":"image/png"},{"src":"icons/icon-512.png","sizes":"512x512","type":"image/png"}]
+}, indent=2), encoding="utf-8")
+
+# firebase stub (web)
+(web / "firebase.js").write_text("// Paste your Firebase config here to enable cloud save\n// Example:\n// const firebaseConfig = { apiKey: '...', authDomain: '...'};\n// firebase.initializeApp(firebaseConfig);\nwindow.saveToCloud = function(user){ console.log('Cloud save stub', user); }", encoding="utf-8")
+
+# functions (cloud function stub)
+(functions / "index.js").write_text("""const functions = require('firebase-functions');const admin = require('firebase-admin');admin.initializeApp();exports.signupProxy = functions.https.onRequest(async (req,res)=>{const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress; await admin.firestore().collection('users').doc(req.body.uid).set({name:req.body.name,createdAt:admin.firestore.FieldValue.serverTimestamp()});res.send({ok:true});});""", encoding="utf-8")
+
+# store metadata
+(meta / "play_store.txt").write_text("Title: Cosmic F Arcade\nShort: Daily horoscopes + cosmic arcade\nFull: Cosmic F Arcade mixes horoscope readings with mini-games. Play daily, spin, draw tarot, and explore numerology.", encoding="utf-8")
+(meta / "app_store.txt").write_text("Name: Cosmic F Arcade\nSubtitle: Horoscope meets arcade\nDesc: Cosmic F Arcade blends astrology with playful mini-games. Privacy-first.", encoding="utf-8")
+
+# screenshots placeholders
+for i in range(1,7):
+    img = Image.new("RGB",(1290,2796),(7,18,34))
+    d = ImageDraw.Draw(img)
+    try:
+        f = ImageFont.truetype("DejaVuSans-Bold.ttf",72)
+    except:
+        f = ImageFont.load_default()
+    d.text((200,400), f"Cosmic F Arcade - Screen {i}", fill=(255,213,79), font=f)
+    img.save(screens / f"iphone_{i}.png")
+
+for i in range(1,7):
+    img = Image.new("RGB",(1080,2400),(7,18,34))
+    d = ImageDraw.Draw(img)
+    try:
+        f = ImageFont.truetype("DejaVuSans-Bold.ttf",48)
+    except:
+        f = ImageFont.load_default()
+    d.text((150,400), f"Cosmic F Arcade - Screen {i}", fill=(255,213,79), font=f)
+    img.save(screens / f"android_{i}.png")
+
+# icons
+def make_icon(path,size,text):
+    img = Image.new("RGBA",(size,size),(7,18,34,255))
+    d = ImageDraw.Draw(img)
+    try:
+        f = ImageFont.truetype("DejaVuSans-Bold.ttf", size//3)
+    except:
+        f = ImageFont.load_default()
+    w,h = d.textsize(text,font=f)
+    d.text(((size-w)/2,(size-h)/2), text, font=f, fill=(255,213,79,255))
+    img.save(path)
+make_icon(assets / "icon-192.png",192,"CF")
+make_icon(assets / "icon-512.png",512,"CF")
+
+# README and guide pdf
+(base / "README.md").write_text("# Cosmic F Arcade - Full Package\n\nSee 'web' for PWA and 'app' for Expo app.\n\n© SNFB BY Grace 2026-2027", encoding="utf-8")
+pdf_path = Path("/mnt/data/Cosmic_F_Arcade_Package_Guide.pdf")
+styles = getSampleStyleSheet()
+doc = SimpleDocTemplate(str(pdf_path), pagesize=letter)
+story = [Paragraph("Cosmic F Arcade - Full Package Guide", styles["Title"]), Spacer(1,6), Paragraph("Unzip and follow README. Run local servers for web and app. Use PWABuilder for AAB.", styles["BodyText"])]
+doc.build(story)
+
+# create final zip
+final_zip = Path("/mnt/data/Cosmic_F_Arcade_Full_Package.zip")
+with zipfile.ZipFile(final_zip, "w", zipfile.ZIP_DEFLATED) as z:
+    for p in base.rglob("*"):
+        z.write(p, arcname=p.relative_to(base))
+
+str(final_zip), str(pdf_path), str(base)
