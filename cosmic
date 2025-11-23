@@ -1,0 +1,9 @@
+cosmic-f-arcade/
+│
+├── app/           (React Native mobile app)
+├── website/       (Next.js website)
+├── assets/
+│   ├── icons/
+│   ├── teaser-video-script/
+│   └── security/
+└── README.md
