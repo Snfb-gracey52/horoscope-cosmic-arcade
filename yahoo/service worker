@@ -1,0 +1,43 @@
+// service-worker.js — hardened allowlist caching + runtime checks
+const CACHE_NAME = "horoscope-v1";
+const ALLOWLIST = [
+  "/", "/index.html", "/style.css", "/slot.js", "/signup.js",
+  "/manifest.json", "/privacy.html", "/icons/icon-192.png", "/icons/icon-512.png"
+];
+
+// Install event: cache only allowlist
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => cache.addAll(ALLOWLIST))
+  );
+  self.skipWaiting();
+});
+
+// Activate: cleanup old caches
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.map(k => (k !== CACHE_NAME) ? caches.delete(k) : Promise.resolve()))
+    )
+  );
+  self.clients.claim();
+});
+
+// Fetch: serve from cache or fetch only same-origin
+self.addEventListener('fetch', event => {
+  const url = new URL(event.request.url);
+
+  // Allow only same-origin requests or approved Google services
+  if (url.origin !== location.origin &&
+      !url.hostname.endsWith('googleapis.com') &&
+      !url.hostname.endsWith('youtube.com') &&
+      !url.hostname.endsWith('gstatic.com')) {
+    // Block third-party remote loads
+    return event.respondWith(new Response('', { status: 403, statusText: 'Blocked by SW' }));
+  }
+
+  // Prefer cache
+  event.respondWith(
+    caches.match(event.request).then(resp => resp || fetch(event.request))
+  );
+});
