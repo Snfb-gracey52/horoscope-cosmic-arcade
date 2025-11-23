@@ -1,0 +1,378 @@
+# Retry: recreate ZIP and PDF, handling long tokens by inserting breaks
+from pathlib import Path
+import zipfile, textwrap
+from fpdf import FPDF
+from PIL import Image, ImageDraw, ImageFont
+import os
+
+out_dir = Path("/mnt/data/horoscope_slots")
+if out_dir.exists():
+    # clear directory
+    for p in out_dir.rglob("*"):
+        if p.is_file():
+            p.unlink()
+        else:
+            try:
+                p.rmdir()
+            except:
+                pass
+out_dir.mkdir(parents=True, exist_ok=True)
+
+files = {
+"index.html": """<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Horoscope Slots</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</head>
+
+<body>
+
+<div class="app">
+    <h2>✨ Horoscope Slots ✨</h2>
+
+    <div id="signupBox">
+        <p>Enter your name to start:</p>
+        <input id="nameInput" placeholder="Your name">
+        <button onclick="simpleSignup()">Start</button>
+    </div>
+
+    <p id="welcome"></p>
+
+    <div id="gameArea" style="display:none;">
+        <div class="slots">
+            <div class="reel" id="r1">♈</div>
+            <div class="reel" id="r2">♉</div>
+            <div class="reel" id="r3">♊</div>
+            <div class="bonus" id="bonus">⭐</div>
+        </div>
+
+        <button id="spin">SPIN</button>
+
+        <div id="resultBox">
+            <h3 id="resultTitle">Ready!</h3>
+            <p id="resultText">Press SPIN to play.</p>
+        </div>
+
+        <h3>Daily Horoscope Video</h3>
+        <div id="ytPlayer"></div>
+    </div>
+
+</div>
+
+<script src="firebase-config.js"></script>
+<script src="signup.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
+""",
+"style.css": """body {
+    background:#0d1226;
+    color:white;
+    font-family:Arial;
+    display:flex;
+    justify-content:center;
+    padding:25px;
+}
+
+.app { width:350px; text-align:center; }
+
+.slots {
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin:20px 0;
+}
+
+.reel, .bonus {
+    width:60px; height:60px;
+    display:flex; justify-content:center; align-items:center;
+    background:#1a223d;
+    border-radius:8px;
+    font-size:32px;
+}
+
+.bonus { background:#ffd54f; color:black; }
+
+button {
+    background:#ff9900; border:none;
+    padding:10px; width:100%;
+    margin:5px 0; border-radius:10px;
+    font-weight:bold; cursor:pointer;
+}
+
+input { padding:8px; width:80%; margin-bottom:8px; border-radius:6px; border:1px solid #333; }
+""",
+"firebase-config.js": """// Replace these values with your Firebase project config:
+const firebaseConfig = {
+  apiKey: "REPLACE_API_KEY",
+  authDomain: "REPLACE_PROJECT.firebaseapp.com",
+  projectId: "REPLACE_PROJECT_ID",
+  storageBucket: "REPLACE_PROJECT.appspot.com",
+  messagingSenderId: "REPLACE_SENDER_ID",
+  appId: "REPLACE_APP_ID"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+""",
+"signup.js": """function simpleSignup() {
+    let name = document.getElementById("nameInput").value.trim();
+    if (!name) {
+        alert("Enter your name");
+        return;
+    }
+
+    let fakeEmail = "user_" + Math.floor(Math.random()*999999) + "@app.local";
+
+    auth.signInAnonymously().then(userCred => {
+        const uid = userCred.user.uid;
+        db.collection("users").doc(uid).set({
+            name: name,
+            email: fakeEmail,
+            joined: new Date().toISOString()
+        });
+        document.getElementById("signupBox").style.display = "none";
+        document.getElementById("welcome").textContent = "Welcome, " + name + "!";
+        document.getElementById("gameArea").style.display = "block";
+    }).catch(err=>{
+        console.error(err);
+        alert('Signup error: ' + err.message);
+    });
+}
+""",
+"app.js": """const signs = ["♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓"];
+const bonusIcons = ["⭐","💎","🔮","💰"];
+
+document.getElementById("spin").onclick = () => {
+    const r1 = document.getElementById("r1");
+    const r2 = document.getElementById("r2");
+    const r3 = document.getElementById("r3");
+    const bonus = document.getElementById("bonus");
+    const resultTitle = document.getElementById("resultTitle");
+    const resultText = document.getElementById("resultText");
+
+    r1.textContent = signs[Math.floor(Math.random()*12)];
+    r2.textContent = signs[Math.floor(Math.random()*12)];
+    r3.textContent = signs[Math.floor(Math.random()*12)];
+    bonus.textContent = bonusIcons[Math.floor(Math.random()*bonusIcons.length)];
+
+    if (r1.textContent === r2.textContent && r2.textContent === r3.textContent) {
+        resultTitle.textContent = "💥 Jackpot!";
+        resultText.textContent = "Your horoscope alignment is strong today!";
+    } else {
+        resultTitle.textContent = "✨ Horoscope";
+        resultText.textContent = "Balance and good fortune surround you.";
+    }
+};
+
+function onYouTubeIframeAPIReady() {
+    new YT.Player("ytPlayer", {
+        height: "200",
+        width: "100%",
+        videoId: "dQw4w9WgXcQ" // replace with your promo video id
+    });
+}
+
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("service-worker.js").catch(()=>{});
+}
+""",
+"manifest.json": """{
+  "name": "Horoscope Slots",
+  "short_name": "Slots",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#0d1226",
+  "theme_color": "#0d1226",
+  "icons": [
+    {"src":"icons/icon-192.png","sizes":"192x192","type":"image/png"},
+    {"src":"icons/icon-512.png","sizes":"512x512","type":"image/png"}
+  ]
+}
+""",
+"service-worker.js": """self.addEventListener("install", e => {
+    e.waitUntil(
+        caches.open("slot-cache").then(cache => {
+            return cache.addAll([
+                "index.html",
+                "style.css",
+                "app.js",
+                "signup.js",
+                "firebase-config.js",
+                "manifest.json"
+            ]);
+        })
+    );
+});
+
+self.addEventListener("fetch", e => {
+    e.respondWith(
+        caches.match(e.request).then(r => r || fetch(e.request))
+    );
+});
+""",
+"website.html": """<!DOCTYPE html>
+<html>
+<head>
+<title>Horoscope Slots</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { font-family: Arial; padding:20px; background:#f5f7fb; color:#111; }
+.container { max-width:700px; margin:auto; background:white; padding:20px; border-radius:8px; box-shadow:0 6px 24px rgba(2,6,23,0.08);}
+button { padding:12px; background:#0d1226; color:white; width:100%; border:none; border-radius:6px; cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>✨ Horoscope Slots ✨</h1>
+<p>Play daily fortune slots and unlock bonus rewards. Simple signup, no password.</p>
+<a href="index.html"><button>Open App</button></a>
+</div>
+</body>
+</html>
+""",
+"promo.html": """<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport"content="width=device-width,initial-scale=1"/><title>Promo</title>
+<style>body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#07122a,#021025);font-family:system-ui;color:white}
+.card{width:900px;padding:40px;border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02));box-shadow:0 20px 60px rgba(2,6,23,0.7);text-align:center}
+.title{font-size:36px;font-weight:800;display:flex;gap:12px;align-items:center;justify-content:center}
+.reels{display:flex;gap:14px;justify-content:center;margin:22px 0}
+.r{width:130px;height:130px;border-radius:12px;background:#ffffff10;display:flex;align-items:center;justify-content:center;font-size:56px;transition:transform .6s}
+.btn{display:inline-block;margin-top:12px;padding:10px 18px;border-radius:10px;background:#ff9d00;color:#07122a;font-weight:800}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.2)}100%{transform:scale(1)}}
+.pop{animation:pop 900ms ease}
+</style></head><body>
+<div class="card" id="card">
+  <div class="title"><div style="font-size:46px">♈</div><div>Horoscope Slots</div></div>
+  <div class="reels">
+    <div class="r" id="p0">—</div>
+    <div class="r" id="p1">—</div>
+    <div class="r" id="p2">—</div>
+  </div>
+  <div id="line" style="color:#cfe8ff">Spin the stars — quick daily horoscopes</div>
+  <div><span class="btn" id="play">Play Clip →</span></div>
+</div>
+<script>
+const icons=["♈","♉","♊","♋","♌","♍","♎","♏","♐","♑","♒","♓"];
+const p0=document.getElementById('p0'),p1=document.getElementById('p1'),p2=document.getElementById('p2');
+document.getElementById('play').onclick=()=>{const seq=[rand(),rand(),rand()];p0.textContent=seq[0];p1.textContent=seq[1];p2.textContent=seq[2];[p0,p1,p2].forEach((el,i)=>{el.style.transform='translateY(-40px)';setTimeout(()=>el.style.transform='',400+i*120);});setTimeout(()=>{if(seq[0]===seq[1]&&seq[1]===seq[2]){document.getElementById('line').textContent="💥 Triple Match! Energy amplified.";[p0,p1,p2].forEach(el=>el.classList.add('pop'));setTimeout(()=>[p0,p1,p2].forEach(el=>el.classList.remove('pop')),900);}else{document.getElementById('line').textContent="✨ Get your daily vibe — install now."}},700)};
+function rand(){return icons[Math.floor(Math.random()*icons.length)];}
+</script></body></html>
+""",
+"README_STEPS.txt": """HOROSCOPE SLOTS - QUICK DEPLOY STEPS
+
+1) Edit firebase-config.js: paste your Firebase web app config values.
+
+2) Create Firebase project:
+   - Go to https://firebase.google.com
+   - Create project (name: Horoscope Slots)
+   - Enable Authentication -> Sign-in method -> Anonymous
+   - Enable Firestore (optional for saving users)
+   - Add Web App and get config
+
+3) Test locally:
+   - Open index.html in a browser (recommended: use a simple server)
+   - For local file testing, some browsers block firebase; run local server:
+     python3 -m http.server 8000
+     Then open http://localhost:8000
+
+4) Deploy to GitHub:
+   - Create new GitHub repo 'horoscope-slots'
+   - Upload all files at repo root
+   - Enable GitHub Pages (Settings -> Pages -> Branch: main, Root)
+   - Wait a minute, then open the published site URL
+
+5) Deploy to Netlify (alternative):
+   - Drag & drop the zip to Netlify Drop or connect repo to Netlify
+
+6) Prepare for App Stores:
+   - For Android: wrap the site as PWA in Android using Bubblewrap/PWABuilder to generate an AAB
+   - For iOS: create a native wrapper (Capacitor or similar) and follow Apple guidelines
+   - Ensure privacy policy and app icons are set
+   - Test thoroughly on devices before submitting
+
+7) YouTube promo:
+   - Open promo.html and screen-record the window (QuickTime / OBS)
+   - Add audio/music in a video editor, export MP4, upload to YouTube
+
+8) Notes:
+   - Replace placeholder videoId in app.js with your promo YouTube video id
+   - Use HTTPS hosting for production
+   - If you use Firestore, update rules for security
+"""
+}
+
+# write files
+for name, content in files.items():
+    path = out_dir / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+# icons
+icons_dir = out_dir / "icons"
+icons_dir.mkdir(exist_ok=True)
+from PIL import Image, ImageDraw, ImageFont
+def make_icon(path, size, text):
+    img = Image.new("RGBA", (size, size), (13,18,38,255))
+    draw = ImageDraw.Draw(img)
+    draw.ellipse([(10,10),(size-10,size-10)], fill=(245,158,11,255))
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", size//3)
+    except:
+        font = ImageFont.load_default()
+    w,h = draw.textsize(text, font=font)
+    draw.text(((size-w)/2,(size-h)/2), text, font=font, fill=(7,17,34,255))
+    img.save(path)
+
+make_icon(icons_dir / "icon-192.png", 192, "♈")
+make_icon(icons_dir / "icon-512.png", 512, "♈")
+
+# create zip
+zip_path = Path("/mnt/data/horoscope_slots.zip")
+with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+    for file in out_dir.rglob("*"):
+        zipf.write(file, arcname=file.relative_to(out_dir))
+
+# create PDF with safer wrapping: insert spaces into very long tokens
+def safe_tokenize(line, maxlen=60):
+    parts = line.split(' ')
+    out_parts = []
+    for p in parts:
+        if len(p) > maxlen:
+            # insert spaces every maxlen chars
+            chunks = [p[i:i+maxlen] for i in range(0, len(p), maxlen)]
+            out_parts.append(' '.join(chunks))
+        else:
+            out_parts.append(p)
+    return ' '.join(out_parts)
+
+pdf_path = Path("/mnt/data/horoscope_slots_instructions.pdf")
+pdf = FPDF()
+pdf.set_auto_page_break(auto=True, margin=12)
+pdf.add_page()
+pdf.set_font("Arial", 'B', 16)
+pdf.cell(0, 10, "Horoscope Slots - Setup & Deploy Instructions", ln=True)
+pdf.ln(4)
+pdf.set_font("Arial", size=11)
+for raw_line in files["README_STEPS.txt"].splitlines():
+    line = safe_tokenize(raw_line)
+    if not line.strip():
+        pdf.ln(3)
+    else:
+        wrapped = textwrap.wrap(line, width=90)
+        for w in wrapped:
+            pdf.multi_cell(0, 6, w)
+pdf.output(str(pdf_path))
+
+{"zip": str(zip_path), "pdf": str(pdf_path)}
+
