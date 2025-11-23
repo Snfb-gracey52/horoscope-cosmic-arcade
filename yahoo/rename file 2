@@ -1,0 +1,45 @@
+# Create a PDF by rendering the README text to an image (avoids FPDF unicode/font issues)
+from PIL import Image, ImageDraw, ImageFont
+from pathlib import Path
+import textwrap
+
+out_dir = Path("/mnt/data/horoscope_slots")
+readme = out_dir / "README_STEPS.txt"
+pdf_path = Path("/mnt/data/horoscope_slots_instructions.pdf")
+
+text = readme.read_text(encoding="utf-8")
+
+# prepare font
+try:
+    font = ImageFont.truetype("DejaVuSans.ttf", 16)
+except:
+    font = ImageFont.load_default()
+
+# wrap text to fit width
+img_width = 1200
+margin = 40
+line_height = font.getsize("A")[1] + 6
+max_chars = 100  # rough
+lines = []
+for paragraph in text.splitlines():
+    if paragraph.strip() == "":
+        lines.append("")
+    else:
+        wrapped = textwrap.wrap(paragraph, width=100)
+        lines.extend(wrapped)
+
+img_height = margin*2 + line_height * (len(lines) + 2)
+# create image
+img = Image.new("RGB", (img_width, img_height), color=(255,255,255))
+draw = ImageDraw.Draw(img)
+y = margin
+draw.text((margin, y), "Horoscope Slots - Setup & Deploy Instructions", font=font, fill=(0,0,0))
+y += line_height * 2
+for line in lines:
+    draw.text((margin, y), line, font=font, fill=(0,0,0))
+    y += line_height
+
+# save as PDF
+img.save(pdf_path, "PDF", resolution=100.0)
+{"pdf": str(pdf_path)}
+
