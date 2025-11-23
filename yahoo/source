@@ -1,0 +1,3 @@
+# compute slot.js
+openssl dgst -sha256 -binary slot.js | openssl base64
+# copy the output and paste into REPLACE_BASE64_HASH_SLOTJS
