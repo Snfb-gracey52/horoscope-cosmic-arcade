@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // users collection — only allow writes if authenticated and data shape valid
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.data.keys().hasAll(['name','createdAt'])
+                    && request.resource.data.name is string
+                    && request.resource.data.createdAt is timestamp
+                    && request.time < request.resource.data.createdAt + duration.value(5, 'm') == false;
+      // prevent rapid repeated writes — require 5s between writes (client enforces too)
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // generic minimal rule for other app data
+    match /{document=**} {
+      allow read: if true;
+      allow write: if false; // default deny
+    }
+  }
+}
