@@ -1,0 +1,15 @@
+const firebaseConfig = {
+  apiKey: "YOUR_KEY_HERE",
+  authDomain: "YOUR_ID.firebaseapp.com",
+  projectId: "YOUR_ID",
+  storageBucket: "YOUR_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER",
+  appId: "YOUR_APPID"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+window.saveToCloud = function(user){
+    db.collection("users").doc(user.uid).set(user, { merge:true });
+};
