@@ -1,0 +1,13 @@
+import React from "react";
+import { View, Text } from "react-native";
+
+export default function Settings() {
+  return (
+    <View style={{ padding: 20 }}>
+      <Text style={{ fontSize: 19 }}>Security</Text>
+      <Text>• Offline protection enabled</Text>
+      <Text>• No external tracking</Text>
+      <Text>• Service Worker hardened</Text>
+    </View>
+  );
+}
