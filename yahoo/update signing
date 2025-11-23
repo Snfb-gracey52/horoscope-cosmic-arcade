@@ -1,0 +1,22 @@
+// Instead of local save or direct Firestore write:
+async function quickSignup(){
+  const input = document.getElementById('emailInput');
+  const v = (input.value||'').trim();
+  if(!v){ document.getElementById('signupStatus').textContent='Please enter name or email.'; return; }
+  const uid = 'user_' + Math.floor(Math.random()*999999);
+  const entry = { uid, name: v };
+
+  // POST to Cloud Function
+  try {
+    const resp = await fetch('https://us-central1-YOUR_PROJECT.cloudfunctions.net/signupProxy', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(entry)
+    });
+    const j = await resp.json();
+    if(resp.ok){ localStorage.setItem('horoscope_user', JSON.stringify(entry)); /* proceed */ }
+    else { document.getElementById('signupStatus').textContent = j.error || 'Signup failed'; }
+  } catch (e) {
+    document.getElementById('signupStatus').textContent = 'Network error';
+  }
+}
