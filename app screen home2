@@ -1,0 +1,20 @@
+import React, { useState } from "react";
+import { View, Text, Button } from "react-native";
+
+export default function Horoscope() {
+  const [sign, setSign] = useState("Aries");
+  const [result, setResult] = useState("");
+
+  const generate = () => {
+    const reading = "Today your cosmic energy is aligned with bold moves.";
+    setResult(reading);
+  };
+
+  return (
+    <View style={{ padding: 20 }}>
+      <Text style={{ fontSize: 22 }}>Horoscope</Text>
+      <Button title="Generate Reading" onPress={generate} />
+      <Text>{result}</Text>
+    </View>
+  );
+}
