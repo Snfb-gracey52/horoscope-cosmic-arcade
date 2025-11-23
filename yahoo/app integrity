@@ -1,0 +1,32 @@
+// app-integrity.js
+(async function() {
+  // list of files to verify and their expected SHA-256 base64 digests
+  const expected = {
+    "/slot.js": "REPLACE_BASE64_HASH_SLOTJS",
+    "/signup.js": "REPLACE_BASE64_HASH_SIGNUPJS",
+    "/index.html": "REPLACE_BASE64_HASH_INDEX"
+  };
+
+  async function fetchAndHash(path) {
+    try {
+      const r = await fetch(path, {cache: "no-store"});
+      const buf = await r.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest('SHA-256', buf);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashBase64 = btoa(String.fromCharCode.apply(null, hashArray));
+      return hashBase64;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  for (const [path, expectedBase64] of Object.entries(expected)) {
+    const h = await fetchAndHash(path);
+    if (!h || h !== expectedBase64) {
+      console.error("INTEGRITY CHECK FAILED:", path, h, expectedBase64);
+      // Notify user and stop further script execution by throwing
+      document.body.innerHTML = "<h2>Security check failed. Please reload or update the app.</h2>";
+      throw new Error("Integrity check failed for " + path);
+    }
+  }
+})();
