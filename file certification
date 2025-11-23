@@ -1,0 +1,38 @@
+// Cosmic F Arcade — File Integrity Verification
+// Copyright SNFB BY Grace 2026-2027
+
+const expectedHashes = {
+  "index.html": "91f46fef3c403ea851b95a812c5b8ef0ea1277ca5b0e57c04988bfc7c1d7785b",
+  "slot.js": "c65f3a117e43a8ecaa52d2aac6099168fd5e17fa0dd35a0ccc0ddfd4a99fa511",
+  "tarot.js": "401bba6448e1608d75b9314b62bcedf804e7bb25107c6a893bc27eede932c64e",
+  "numerology.js": "c54fa7af2764acbd35a2af5c53e9e222255b6203af7953dac1cbd61ecda3c155"
+};
+
+async function verifyIntegrity() {
+  for (const file in expectedHashes) {
+    try {
+      const res = await fetch(file);
+      const text = await res.text();
+      const hash = await digest(text);
+
+      if (hash !== expectedHashes[file]) {
+        console.warn("⚠ Integrity mismatch for " + file);
+      } else {
+        console.log("✓ Verified " + file);
+      }
+    } catch (e) {
+      console.error("Error verifying " + file, e);
+    }
+  }
+}
+
+async function digest(str) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return [...new Uint8Array(digest)]
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+verifyIntegrity();
