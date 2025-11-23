@@ -1,0 +1,14 @@
+index.html
+style.css
+slot.js
+signup.js
+firebase.js
+manifest.json
+service-worker.js
+/horoscope
+/tarot
+/numerology
+/assets
+/icons
+/features
+/privacy.html
