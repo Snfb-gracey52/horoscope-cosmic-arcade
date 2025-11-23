@@ -1,0 +1,14 @@
+export default function Home() {
+  return (
+    <main style={{ padding: "40px" }}>
+      <h1>Cosmic F Arcade</h1>
+      <p>Your portal to daily horoscopes and cosmic arcade fun.</p>
+
+      <ul>
+        <li>Daily cosmic readings</li>
+        <li>Mini arcade universe</li>
+        <li>Privacy-first design</li>
+      </ul>
+    </main>
+  );
+}
