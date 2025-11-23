@@ -1,0 +1,6 @@
+// service-worker.js
+
+const CACHE_NAME = 'horoscope-app-cache-v1';
+const urlsToCache = [
+  '/',
+  '/
