@@ -1,0 +1,9 @@
+cosmic_f_arcade_full_package/
+├─ app/                # Expo React Native starter (screens + games)
+├─ web/                # PWA web files (index.html, slot.html, tarot.html, numerology.html)
+├─ assets/             # icons and images
+├─ screenshots/        # iPhone + Android mock screenshots
+├─ store_metadata/     # Play Store / App Store text files
+├─ functions/          # Firebase Cloud Function stubs
+├─ security/           # app-integrity.js and security notes
+README.md
